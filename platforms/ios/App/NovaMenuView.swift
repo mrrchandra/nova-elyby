@@ -76,7 +76,7 @@ struct NovaMenuView: View {
         }
         .ignoresSafeArea()
         .sheet(isPresented: $showAccounts) {
-            NovaAccountSheet(account: accounts)
+            NovaAccountSheet(account: accounts, elyAccount: elyAccount)
         }
         .sheet(isPresented: $showDiscord) {
             NovaDiscordBrowser()
@@ -178,6 +178,7 @@ private struct NovaDiscordBrowser: UIViewControllerRepresentable {
 /// Only public Minecraft names/UUIDs appear here. Secrets stay in Keychain.
 private struct NovaAccountSheet: View {
     @ObservedObject var account: NovaMicrosoftAccount
+    @ObservedObject var elyAccount: NovaElyAccount
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -247,34 +248,7 @@ private struct NovaAccountSheet: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-                Section("Ely.by sign-in") {
-                    switch elyAccount.state {
-                    case .idle:
-                        Button("Add Ely.by account") { elyAccount.signIn() }
-                    case let .working(stage):
-                        HStack {
-                            ProgressView()
-                            Text(stage)
-                        }
-                        Button("Cancel sign-in") { elyAccount.cancel() }
-                    case let .code(code, url):
-                        Text("Open the link and enter this code:")
-                        Text(code)
-                            .font(.system(.title2, design: .monospaced).bold())
-                            .textSelection(.enabled)
-                        Button("Copy code") { UIPasteboard.general.string = code }
-                        Button("Open sign-in page") { UIApplication.shared.open(url) }
-                        Button("Cancel sign-in") { elyAccount.cancel() }
-                    case let .failed(message):
-                        Text(message).foregroundStyle(.red)
-                        Button("Try signing in again") { elyAccount.signIn() }
-                    }
-                    if NovaElyAccount.clientID == nil {
-                        Text("Ely.by sign-in is not configured in this build. The distributor must provide an approved application ID.")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-                }
+                elySection
                 Section {
                     if let bootIssue = UserDefaults.standard.string(forKey: NovaAccountBoot.issueKey) {
                         Text(bootIssue).foregroundStyle(.orange)
@@ -291,6 +265,38 @@ private struct NovaAccountSheet: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
                 }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var elySection: some View {
+        Section("Ely.by sign-in") {
+            switch elyAccount.state {
+            case .idle:
+                Button("Add Ely.by account") { elyAccount.signIn() }
+            case let .working(stage):
+                HStack {
+                    ProgressView()
+                    Text(stage)
+                }
+                Button("Cancel sign-in") { elyAccount.cancel() }
+            case let .code(code, url):
+                Text("Open the link and enter this code:")
+                Text(code)
+                    .font(.system(.title2, design: .monospaced).bold())
+                    .textSelection(.enabled)
+                Button("Copy code") { UIPasteboard.general.string = code }
+                Button("Open sign-in page") { UIApplication.shared.open(url) }
+                Button("Cancel sign-in") { elyAccount.cancel() }
+            case let .failed(message):
+                Text(message).foregroundStyle(.red)
+                Button("Try signing in again") { elyAccount.signIn() }
+            }
+            if NovaElyAccount.clientID == nil {
+                Text("Ely.by sign-in is not configured in this build. The distributor must provide an approved application ID.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
         }
     }

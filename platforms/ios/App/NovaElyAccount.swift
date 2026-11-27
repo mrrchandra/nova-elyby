@@ -163,15 +163,15 @@ final class NovaElyAccount: ObservableObject {
                 let tokens = try await exchangeCode(code, verifier: verifier, client: client, redirectURI: redirectURI)
                 try Task.checkCancellation()
                 guard generation == attempt, selection == epoch else { throw CancellationError() }
-                let profile = try await fetchProfile(token: tokens.access, name: tokens.name)
+                let fetched = try await fetchProfile(token: tokens.access, name: tokens.name)
                 try Task.checkCancellation()
                 guard generation == attempt, selection == epoch else { throw CancellationError() }
                 try vault.write(AccountSecrets(refresh: tokens.refresh, token: tokens.access,
-                                              expires: tokens.expires), for: profile.uuid)
-                if let i = accounts.firstIndex(where: { $0.uuid == profile.uuid }) { accounts[i] = profile }
-                else { accounts.append(profile) }
+                                              expires: tokens.expires), for: fetched.uuid)
+                if let i = accounts.firstIndex(where: { $0.uuid == fetched.uuid }) { accounts[i] = fetched }
+                else { accounts.append(fetched) }
                 try saveCatalog()
-                profile = profile; invalidSelection = false; selection = UUID(); try saveCatalog()
+                profile = fetched; invalidSelection = false; selection = UUID(); try saveCatalog()
                 state = .idle; signing = nil
             } catch is CancellationError {
                 if generation == attempt { state = .idle }
@@ -187,7 +187,7 @@ final class NovaElyAccount: ObservableObject {
     private func listenForCallback(port: Int, state: String, timeout: TimeInterval) async throws -> String {
         // Use a simple TCP listener on localhost
         let listener = try NWListener(using: .tcp, on: NWEndpoint.Port(integerLiteral: UInt16(port)))
-        let codePromise = withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
+        let codePromise = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
             var resumed = false
             listener.newConnectionHandler = { connection in
                 connection.start(queue: .global())
@@ -278,4 +278,3 @@ final class NovaElyAccount: ObservableObject {
         return Profile(name: profileName, uuid: normalized)
     }
 }
-PYEOF
