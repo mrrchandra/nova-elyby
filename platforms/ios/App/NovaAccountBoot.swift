@@ -15,13 +15,30 @@ enum NovaAccountBoot {
         let defaults = UserDefaults.standard
         defaults.removeObject(forKey: issueKey)
 
-        guard let publicData = defaults.data(forKey: "microsoftAccounts.v2"),
-              let catalog = try? JSONDecoder().decode(NovaMicrosoftAccount.Catalog.self, from: publicData),
-              let selectedID = catalog.selected,
-              let selected = catalog.profiles.first(where: { $0.uuid == selectedID }) else {
-            return // Explicit offline selection or no account configured.
+        // Try Microsoft accounts first
+        if let publicData = defaults.data(forKey: "microsoftAccounts.v2"),
+           let catalog = try? JSONDecoder().decode(NovaMicrosoftAccount.Catalog.self, from: publicData),
+           let selectedID = catalog.selected,
+           let selected = catalog.profiles.first(where: { $0.uuid == selectedID }) {
+            // Microsoft boot path (existing)
+            bootMicrosoft(selected: selected, catalog: catalog, defaults: defaults)
+            return
         }
 
+        // Try Ely.by accounts
+        if let publicData = defaults.data(forKey: "elyAccounts.v1"),
+           let catalog = try? JSONDecoder().decode(NovaElyAccount.Catalog.self, from: publicData),
+           let selectedID = catalog.selected,
+           let selected = catalog.profiles.first(where: { $0.uuid == selectedID }) {
+            bootEly(selected: selected, defaults: defaults)
+            return
+        }
+
+        // No account configured - offline mode
+        return
+    }
+
+    private static func bootMicrosoft(selected: NovaMicrosoftAccount.Profile, catalog: NovaMicrosoftAccount.Catalog, defaults: UserDefaults) {
         let vault = KeychainAccountVault()
         do {
             guard var secrets = try vault.read(selected.uuid) else {
@@ -29,8 +46,7 @@ enum NovaAccountBoot {
                 return
             }
             var profile = selected
-            // A nearly expired Minecraft session must be renewed before boot;
-            // the running Horizon engine cannot switch its startup identity.
+            // A nearly expired Minecraft session must be renewed before boot
             if secrets.expires.timeIntervalSinceNow < 300 {
                 guard let clientID = NovaMicrosoftAccount.clientID else {
                     defaults.set("Microsoft sign-in is not configured in this build.", forKey: issueKey)
@@ -43,8 +59,6 @@ enum NovaAccountBoot {
                     do {
                         let renewed = try await NovaMicrosoftAccount.refresh(clientID, savedSecrets.refresh)
                         try Task.checkCancellation()
-                        // Persist rotation before calling Xbox/Minecraft, as the
-                        // old refresh token may already have been invalidated.
                         try vault.write(AccountSecrets(refresh: renewed.refresh,
                                                        token: savedSecrets.token, expires: savedSecrets.expires),
                                         for: selected.uuid)
@@ -60,7 +74,6 @@ enum NovaAccountBoot {
                     }
                     completed.signal()
                 }
-                // Limit cold-start delay if Microsoft/Xbox services are down.
                 guard completed.wait(timeout: .now() + 90) == .success else {
                     task.cancel()
                     defaults.set("Account renewal timed out. Restart and try again.", forKey: issueKey)
@@ -70,15 +83,6 @@ enum NovaAccountBoot {
                 case let .some(.success((identity, credentials))):
                     profile = identity
                     secrets = credentials
-                    if profile != selected {
-                        var newer = catalog
-                        if let index = newer.profiles.firstIndex(where: { $0.uuid == profile.uuid }) {
-                            newer.profiles[index] = profile
-                            if let updated = try? JSONEncoder().encode(newer) {
-                                defaults.set(updated, forKey: "microsoftAccounts.v2")
-                            }
-                        }
-                    }
                 default:
                     defaults.set("Unable to renew the Microsoft account. Check sign-in and restart.", forKey: issueKey)
                     return
@@ -95,8 +99,6 @@ enum NovaAccountBoot {
                 "user_type": "msa"
             ])
             let sessionFile = try createPrivateHandoff(payload)
-            // Horizon consumes then deletes this file at startup. The location
-            // is in the sandbox's tmp directory, never Files -> Nova -> Game.
             guard setenv("HORIZON_SESSION_FILE", sessionFile.path, 1) == 0 else {
                 try? FileManager.default.removeItem(at: sessionFile)
                 defaults.set("Could not prepare authenticated gameplay. Restart Nova.", forKey: issueKey)
@@ -104,8 +106,36 @@ enum NovaAccountBoot {
             }
             NovaDiagnostics.record("account.session-ready; private-handoff=true")
         } catch {
-            // Do not serialize errors from Keychain, HTTP or auth payloads.
             defaults.set("The selected account could not be loaded securely. Sign in again.", forKey: issueKey)
+        }
+    }
+
+    private static func bootEly(selected: NovaElyAccount.Profile, defaults: UserDefaults) {
+        let vault = KeychainAccountVault()
+        do {
+            guard let secrets = try vault.read(selected.uuid) else {
+                defaults.set("This account needs Ely.by sign-in again.", forKey: issueKey)
+                return
+            }
+            guard secrets.expires.timeIntervalSinceNow > 60 else {
+                defaults.set("Ely.by session expired. Sign in again and restart.", forKey: issueKey)
+                return
+            }
+            let payload = try JSONSerialization.data(withJSONObject: [
+                "name": selected.name,
+                "uuid": selected.uuid,
+                "access_token": secrets.token,
+                "user_type": "elyby"
+            ])
+            let sessionFile = try createPrivateHandoff(payload)
+            guard setenv("HORIZON_SESSION_FILE", sessionFile.path, 1) == 0 else {
+                try? FileManager.default.removeItem(at: sessionFile)
+                defaults.set("Could not prepare authenticated gameplay. Restart Nova.", forKey: issueKey)
+                return
+            }
+            NovaDiagnostics.record("account.session-ready; elyby=true; private-handoff=true")
+        } catch {
+            defaults.set("The selected Ely.by account could not be loaded securely. Sign in again.", forKey: issueKey)
         }
     }
 

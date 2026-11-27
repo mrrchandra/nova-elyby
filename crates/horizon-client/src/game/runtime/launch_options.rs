@@ -138,7 +138,12 @@ impl Options {
                 horizon_client::auth::prepare_chat_keys(true);
             }
             Ok(None) => {}
-            Err(e) => eprintln!("Horizon: not signed in: {e}"),
+            Err(e) => {
+                return Err(launch_api::UsageError(format!(
+                    "Could not load the signed-in account: {e}"
+                ))
+                .into());
+            }
         }
         if let Some(name) = &o.player_name {
             horizon_client::telemetry::note_player(name);

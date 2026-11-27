@@ -22,6 +22,7 @@ targets:
         NovaBuildCommit: $(NOVA_GIT_COMMIT)
         NovaBuildRun: $(NOVA_GIT_RUN)
         HorizonMSAClientID: $(NOVA_MSA_CLIENT_ID)
+        HorizonElyClientID: $(NOVA_ELY_CLIENT_ID)
         LSRequiresIPhoneOS: true
         UIRequiresFullScreen: true
         UIFileSharingEnabled: true
@@ -45,6 +46,7 @@ targets:
         NOVA_GIT_COMMIT: local
         NOVA_GIT_RUN: local
         NOVA_MSA_CLIENT_ID: ""
+        NOVA_ELY_CLIENT_ID: ""
         SWIFT_OBJC_BRIDGING_HEADER: RustBridge/include/HorizonBridge.h
         LIBRARY_SEARCH_PATHS:
           - $(inherited)

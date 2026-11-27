@@ -12,6 +12,7 @@ struct NovaMenuView: View {
     let onClose: () -> Void
 
     @StateObject private var accounts = NovaMicrosoftAccount()
+    @StateObject private var elyAccount = NovaElyAccount()
     @State private var showAccounts = false
     @State private var confirmClose = false
     @State private var showDiscord = false
@@ -242,6 +243,34 @@ private struct NovaAccountSheet: View {
                     }
                     if NovaMicrosoftAccount.clientID == nil {
                         Text("Microsoft sign-in is not configured in this build. The distributor must provide an approved application ID.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                Section("Ely.by sign-in") {
+                    switch elyAccount.state {
+                    case .idle:
+                        Button("Add Ely.by account") { elyAccount.signIn() }
+                    case let .working(stage):
+                        HStack {
+                            ProgressView()
+                            Text(stage)
+                        }
+                        Button("Cancel sign-in") { elyAccount.cancel() }
+                    case let .code(code, url):
+                        Text("Open the link and enter this code:")
+                        Text(code)
+                            .font(.system(.title2, design: .monospaced).bold())
+                            .textSelection(.enabled)
+                        Button("Copy code") { UIPasteboard.general.string = code }
+                        Button("Open sign-in page") { UIApplication.shared.open(url) }
+                        Button("Cancel sign-in") { elyAccount.cancel() }
+                    case let .failed(message):
+                        Text(message).foregroundStyle(.red)
+                        Button("Try signing in again") { elyAccount.signIn() }
+                    }
+                    if NovaElyAccount.clientID == nil {
+                        Text("Ely.by sign-in is not configured in this build. The distributor must provide an approved application ID.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }

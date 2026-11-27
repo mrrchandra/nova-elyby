@@ -42,6 +42,9 @@ enum NovaEntryPoint {
                 // Enable Horizon's experimental compatibility adapter for older servers (e.g. 26.2).
                 setenv("HORIZON_OLDER_SERVERS", "1", 1)
                 NovaDiagnostics.record("boot.older-servers.enabled")
+                // Use Ely.by as the auth provider (replaces Mojang/Microsoft).
+                setenv("HORIZON_AUTH_PROVIDER", "elyby", 1)
+                NovaDiagnostics.record("boot.auth-provider.elyby")
                 // Select and renew the Microsoft session before Horizon reads it.
                 // All tokens remain in Keychain or a private, one-use tmp file.
                 NovaAccountBoot.prepare()

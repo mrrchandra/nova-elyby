@@ -102,7 +102,8 @@ jobs:
             -derivedDataPath Build/Derived CODE_SIGNING_ALLOWED=NO \
             HORIZON_IOS_RUST_LIB=horizon_ios_game_runtime \
             NOVA_GIT_COMMIT="$GITHUB_SHA" NOVA_GIT_RUN="$GITHUB_RUN_ID" \
-            NOVA_MSA_CLIENT_ID="${{ vars.HORIZON_MSA_CLIENT_ID }}" build \
+            NOVA_MSA_CLIENT_ID="${{ vars.HORIZON_MSA_CLIENT_ID }}" \
+            NOVA_ELY_CLIENT_ID="${{ vars.HORIZON_ELY_CLIENT_ID }}" build \
             2>&1 | tee ios-app-link.log
           test -d Build/Derived/Build/Products/Release-iphoneos/Nova.app
       - name: Verify 136 MiB main-stack load command (experimental)

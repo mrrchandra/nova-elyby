@@ -36,6 +36,17 @@ pub const TEXTURE_URIS: [&str; 2] = [
     "http://textures.minecraft.net/texture/{textureId}",
 ];
 
+pub const ELY_TEXTURE_URIS: [&str; 8] = [
+    "https://textures.ely.by/",
+    "http://textures.ely.by/",
+    "https://ely.by/storage/",
+    "http://ely.by/storage/",
+    "https://skinsystem.ely.by/",
+    "http://skinsystem.ely.by/",
+    "https://textures.minecraft.net/texture/{textureId}",
+    "http://textures.minecraft.net/texture/{textureId}",
+];
+
 /// `MinecraftServicesDiscoveryService`'s valid texture URIs: the discovery
 /// document's `profiles` / `getTexture` `validUris`, which
 /// `MinecraftServicesSessionService.isAllowedTextureDomain` checks texture URLs
@@ -46,6 +57,9 @@ pub const TEXTURE_URIS: [&str; 2] = [
 pub fn texture_uris() -> &'static [String] {
     static URIS: std::sync::OnceLock<Vec<String>> = std::sync::OnceLock::new();
     URIS.get_or_init(|| {
+        if crate::auth::using_ely() {
+            return ELY_TEXTURE_URIS.map(str::to_owned).to_vec();
+        }
         crate::auth::discovery_overridden()
             .then(|| crate::auth::discovery().ok())
             .flatten()
